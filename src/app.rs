@@ -50,10 +50,11 @@ live_design!{
 
         text_view = <View> {
             visible: true,
-            text = <Label> {
+            tv_label = <Label> {
                 width: Fit, height: Fit,
                 draw_text: {
-                    text_style: { font_size: 12. }
+                    draw_call_group: other_tv_label
+                    text_style: <GO_NOTO_CURRENT_REGULAR>{ font_size: 12, color: #00f }
                 }
                 text: "Loading image..."
             }
@@ -61,14 +62,20 @@ live_design!{
 
         img_view = <View> {
             visible: false,
-            img = <Image> {
+            iv_img = <Image> {
                 fit: Smallest,
                 width: Fill, height: Fill,
             }
         }
     }
 
-    HtmlImage = {{HtmlImage}} { }
+    HtmlImageTemplate = {{HtmlImage}} {
+        text_view = { tv_label = {
+            draw_text: {
+                draw_call_group: other_tv
+            }
+        } }
+    }
 
     // other blue hyperlink colors: #1a0dab, // #0969da  // #0c50d1
     const LINK_COLOR = #x155EEF
@@ -113,6 +120,7 @@ live_design!{
                 }
                 label1 = <Label> {
                     draw_text: {
+                        draw_call_group: label1_dc
                         color: #f
                     },
                     text: "Counter: 0"
@@ -128,31 +136,18 @@ live_design!{
                     Button = <Button> {
                         text: "Hello world"
                     }
-                    img = <HtmlImage> { }
-
-                    // body: "this is <b>BOLD text</b>&nbsp;<br/><i>italic</i>  <Button>Hi</Button><br/><b><i>Bold italic</i></b>
-                    // <blockquote>\n<p>quote block single line</p>\n</blockquote>
-                    // text at the beginning <br /> <blockquote> <br /> quote block single line <br /> </blockquote> <br />
-                    // top text asldkja sldkja sldkja sldkjas dlkajs ldkajsdl laksjd laksjd laksjd laksjdlkahsldkjhaskj dhkljh lkjh lkldkjahsdlkja   lklkjadhs dl llkj h kll kdjjh  <br /> regular newline, no paragraph <p> after paragraph start </p> after paragraph end <br /> after newline <p> paragraph 1 </p> <p> paragraph 2 </p>
-                    // text at beginning <Button>My Button</Button> text after button before link <a href=\"https://www.google.com/me/\">Google2</a> after link before quote <blockquote>Quoted Text</blockquote> <h1>Header 1</h1>text after h1<h2>Header 2</h2>text after h2 <p> paragraph </p> <h3>Header 3</h3>text after h3<h4>Header 4</h4>text after h4<h5>Header 5</h5>text after h5<h6>Header 6</h6>text after h6 <br />
-                    // <li> <code> Inline code </code> </li>
-                    // this is <br/>
-                    //     <li>one asdf asdfsadflkjalsdkfjl f  alsdkfjalsdkjflakj f sd lkafjldkfjaslkdjf sdflakdjlfjlksajaf asdlkfjlasdkfjlaskdjfla sdlfkjasldkfja sdlfkj asldkfja sldkfjas ldkfjlasdk </li>
-                    //     <li>two</li>
-                    // <br/>
-                    // "
-
-                    // body: "
-                    //     first line <br />
-                    //     <code>let x = 1.0; this is a very long inline code to test wrapping </code> inline text after inline code
-                    //     <pre> test block </pre> <br>
-                    //     <b>BOLD text</b>&nbsp;normal&nbsp;&nbsp;after nbsp <hr/>Next line normal text button: <Button>Hi</Button><br/><blockquote>blockquote<br/><blockquote> nested blockquote</blockquote> after nested</blockquote><i>  <strong>Bold italic</i></strong>
-                    //     <br>text at beginning <pre> this is a code block </pre> text after code block
-                    //     <br /> this <hr> is <br/> <ul> <li>one</li><br/><li>two</li></ul><br/><code>let x = 1.0;</code><b>BOLD text</b>&nbsp;italic<br/><sep/>Next line normal text button: <Button>Hi</Button><br/><block_quote>blockquote<br/><block_quote>blockquote</block_quote></block_quote><i>Bold italic</i>
-                    // "
+                    img = <HtmlImageTemplate> {
+                        text_view = { tv_label = {
+                            draw_text: {
+                                draw_call_group: another_tv_dc
+                            }
+                        } }
+                    }
 
                     body: "
-                        text up top with inline image <img src=\"resources/img/google_logo.png\" width=272 height=92 alt=\"Google Logo\" title=\"Google Logo\" /> text after image <br />
+                        text up top with inline image
+                        <img src=\"resources/img/google_logo.png\" width=272 height=92 alt=\"Google Logo\" title=\"Google Logo\" />
+                        text after image <br />
                         <ol>
                             <li> list item one </li>
                             <li> list item two </li>
@@ -319,6 +314,7 @@ impl Widget for TextOrImage {
     }
 
     fn draw_walk(&mut self, cx: &mut Cx2d, scope: &mut Scope, walk: Walk) -> DrawStep {
+        log!("TextOrImage::draw_walk(): displaying: {:?}, walk: {:?}", self.status(), walk);
         self.view.draw_walk(cx, scope, walk)
     }
 }
@@ -330,9 +326,10 @@ impl TextOrImage {
     /// * `text`: the text that will be displayed in this `TextOrImage`, e.g.,
     ///   a message like "Loading..." or an error message.
     pub fn show_text<T: AsRef<str>>(&mut self, text: T) {
-        self.label(id!(text_view.text)).set_text(text.as_ref());
+        log!("TextOrImage::show_text(): text: {:?}", text.as_ref());
         self.view(id!(img_view)).set_visible(false);
         self.view(id!(text_view)).set_visible(true);
+        self.label(id!(text_view.tv_label)).set_text(text.as_ref());
     }
 
     /// Sets the image content, making the image visible and the text invisible.
@@ -345,7 +342,7 @@ impl TextOrImage {
     pub fn show_image<F, E>(&mut self, image_set_function: F) -> Result<(), E>
         where F: FnOnce(ImageRef) -> Result<(), E>
     {
-        let img_ref = self.image(id!(img_view.img));
+        let img_ref = self.image(id!(img_view.iv_img));
         let res = image_set_function(img_ref);
         if res.is_ok() {
             self.view(id!(img_view)).set_visible(true);
@@ -394,6 +391,7 @@ impl TextOrImageRef {
 }
 
 /// Whether a `TextOrImage` instance is currently displaying text or an image.
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum DisplayStatus {
     Text,
     Image,
@@ -402,7 +400,7 @@ pub enum DisplayStatus {
 
 #[derive(Live, Widget)]
 struct HtmlImage {
-    #[deref] image: TextOrImage,
+    #[deref] toi: TextOrImage,
     /// The URL of the image to display.
     #[rust] src: String,
     /// Alternate text for the image that should be displayed for
@@ -431,14 +429,14 @@ impl LiveHook for HtmlImage {
                             live_id!(title) => self.title = String::from(&attr.value),
                             live_id!(width) => {
                                 if let Ok(width) = attr.value.parse::<usize>() {
-                                    self.image.apply_over(cx, live!{
+                                    self.toi.apply_over(cx, live!{
                                         width: (width),
                                     });
                                 }
                             }
                             live_id!(height) => {
                                 if let Ok(height) = attr.value.parse::<usize>() {
-                                    self.image.apply_over(cx, live!{
+                                    self.toi.apply_over(cx, live!{
                                         height: (height),
                                     });
                                 }
@@ -457,7 +455,18 @@ impl LiveHook for HtmlImage {
                     "Loading image..."
                 };
                 log!("setting ImageOrText text: {:?}", text);
-                self.image.show_text(text);
+                self.toi.show_text(text);
+
+                if !self.src.is_empty() {
+                    // temp: just assume a local path URL only for now
+                    let mut path = std::env::current_dir().unwrap();
+                    path.push(&self.src);
+                    log!("HtmlImage::after_apply(): loading image from path: {:?}", path.to_str().unwrap());
+                    let _res = self.toi.show_image(|image_ref|
+                        image_ref.load_image_dep_by_path(cx, path.to_str().unwrap())
+                    );
+                    log!("HtmlImage::after_apply(): image loaded: {:?}", _res);
+                }
             }
             _ => ()
         }
@@ -473,7 +482,7 @@ impl Widget for HtmlImage {
         scope: &mut Scope,
     ) {
         // log!("HtmlImage::handle_event(): event: {:?}", event);
-        self.image.handle_event(cx, event, scope);
+        self.toi.handle_event(cx, event, scope);
     }
     
     fn draw_walk(&mut self, cx: &mut Cx2d, _scope: &mut Scope, walk: Walk) -> DrawStep {
@@ -481,15 +490,17 @@ impl Widget for HtmlImage {
         if false {
             let mut path = std::env::current_dir().unwrap();
             path.push(&self.src);
-            let _ = self.image.show_image(|image_ref|
+            let _ = self.toi.show_image(|image_ref|
                 image_ref.load_image_dep_by_path(cx, path.to_str().unwrap())
             );
         }
-        self.image.draw_walk(cx, _scope, walk)
+
+        log!("HtmlImage::draw_walk(): displaying: {:?}, walk: {:?}", self.toi.status(), walk);
+        self.toi.draw_walk(cx, _scope, walk)
     }
     
     fn text(&self)->String{
-        self.image.text()
+        self.toi.text()
     }
     
     fn set_text(&mut self, v:&str){
